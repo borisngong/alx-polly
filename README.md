@@ -100,7 +100,7 @@ To begin your security audit, you'll need to get the application running on your
 Clone the repository and install the dependencies:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/borisngong/alx-polly.git
 cd alx-polly
 npm install
 ```
