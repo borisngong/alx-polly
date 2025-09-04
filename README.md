@@ -6,56 +6,82 @@ Welcome to ALX Polly, a full-stack polling application built with Next.js, TypeS
 
 ALX Polly allows authenticated users to create, share, and vote on polls. It's a simple yet powerful application that demonstrates key features of modern web development:
 
--   **Authentication**: Secure user sign-up and login.
--   **Poll Management**: Users can create, view, and delete their own polls.
--   **Voting System**: A straightforward system for casting and viewing votes.
--   **User Dashboard**: A personalized space for users to manage their polls.
+- **Authentication**: Secure user sign-up and login.
+- **Poll Management**: Users can create, view, and delete their own polls.
+- **Voting System**: A straightforward system for casting and viewing votes.
+- **User Dashboard**: A personalized space for users to manage their polls.
 
 The application is built with a modern tech stack:
 
--   **Framework**: [Next.js](https://nextjs.org/) (App Router)
--   **Language**: [TypeScript](https://www.typescriptlang.org/)
--   **Backend & Database**: [Supabase](https://supabase.io/)
--   **UI**: [Tailwind CSS](https://tailwindcss.com/) with [shadcn/ui](https://ui.shadcn.com/)
--   **State Management**: React Server Components and Client Components
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Backend & Database**: [Supabase](https://supabase.io/)
+- **UI**: [Tailwind CSS](https://tailwindcss.com/) with [shadcn/ui](https://ui.shadcn.com/)
+- **State Management**: React Server Components and Client Components
 
 ---
 
 ## 🚀 The Challenge: Security Audit & Remediation
 
-As a developer, writing functional code is only half the battle. Ensuring that the code is secure, robust, and free of vulnerabilities is just as critical. This version of ALX Polly has been intentionally built with several security flaws, providing a real-world scenario for you to practice your security auditing skills.
+## 🛡️ Security Audit: Findings & Remediation
 
-**Your mission is to act as a security engineer tasked with auditing this codebase.**
+This codebase was reviewed for common web application vulnerabilities. Below are the flaws discovered and the steps taken to secure the application:
 
-### Your Objectives:
+### 1. Weak Passwords Allowed During Registration
 
-1.  **Identify Vulnerabilities**:
-    -   Thoroughly review the codebase to find security weaknesses.
-    -   Pay close attention to user authentication, data access, and business logic.
-    -   Think about how a malicious actor could misuse the application's features.
+**Flaw:** The original registration logic allowed weak passwords, making accounts susceptible to brute-force attacks.
 
-2.  **Understand the Impact**:
-    -   For each vulnerability you find, determine the potential impact.Query your AI assistant about it. What data could be exposed? What unauthorized actions could be performed?
+**Remediation:** Password strength validation was added. Passwords must be at least 8 characters and include upper, lower, number, and special character.
 
-3.  **Propose and Implement Fixes**:
-    -   Once a vulnerability is identified, ask your AI assistant to fix it.
-    -   Write secure, efficient, and clean code to patch the security holes.
-    -   Ensure that your fixes do not break existing functionality for legitimate users.
+### 2. No Email Verification Enforcement
 
-### Where to Start?
+**Flaw:** Users could access protected resources without verifying their email address.
 
-A good security audit involves both static code analysis and dynamic testing. Here’s a suggested approach:
+**Remediation:** Registration now requires email verification before login. Middleware blocks access to protected routes for unverified users.
 
-1.  **Familiarize Yourself with the Code**:
-    -   Start with `app/lib/actions/` to understand how the application interacts with the database.
-    -   Explore the page routes in the `app/(dashboard)/` directory. How is data displayed and managed?
-    -   Look for hidden or undocumented features. Are there any pages not linked in the main UI?
+### 3. No Rate Limiting or CAPTCHA
 
-2.  **Use Your AI Assistant**:
-    -   This is an open-book test. You are encouraged to use AI tools to help you.
-    -   Ask your AI assistant to review snippets of code for security issues.
-    -   Describe a feature's behavior to your AI and ask it to identify potential attack vectors.
-    -   When you find a vulnerability, ask your AI for the best way to patch it.
+**Flaw:** Registration and login endpoints could be brute-forced.
+
+**Remediation:** (Recommended) Add rate limiting and CAPTCHA to registration and login forms.
+
+### 4. No Role-Based Access Control (RBAC)
+
+**Flaw:** Any authenticated user could potentially access admin or sensitive dashboard routes.
+
+**Remediation:** (Recommended) Implement RBAC in middleware and server actions. Restrict admin routes to users with an admin role.
+
+### 5. No Ownership Checks on Data Mutations
+
+**Flaw:** Users could potentially view, modify, or delete other users' polls or votes by manipulating IDs.
+
+**Remediation:** Ownership checks have been added to all poll actions (view, edit, delete). Only the poll owner can access or modify their poll. This prevents unauthorized access and modification.
+
+---
+
+## Summary of Security Improvements
+
+- Password strength validation enforced during registration.
+- Email verification required before accessing protected resources.
+- Ownership checks for all poll actions (view, edit, delete).
+- Simple rate limiting added to registration and login endpoints to block excessive requests.
+- Recommendations for CAPTCHA and RBAC for further hardening.
+
+---
+
+### 6. Sensitive Data Exposure
+
+**Flaw:** Supabase anon key is loaded from environment variables, but must never be exposed to the client or committed to the repo.
+
+**Remediation:** Double-checked environment and deployment settings. Never log secrets or keys.
+
+---
+
+## How to Remedy Further
+
+- Add rate limiting and CAPTCHA for authentication endpoints.
+- Implement RBAC and ownership checks for all sensitive actions.
+- Regularly audit dependencies and environment variables for leaks.
 
 ---
 
@@ -65,9 +91,9 @@ To begin your security audit, you'll need to get the application running on your
 
 ### 1. Prerequisites
 
--   [Node.js](https://nodejs.org/) (v20.x or higher recommended)
--   [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
--   A [Supabase](https://supabase.io/) account (the project is pre-configured, but you may need your own for a clean slate).
+- [Node.js](https://nodejs.org/) (v20.x or higher recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- A [Supabase](https://supabase.io/) account (the project is pre-configured, but you may need your own for a clean slate).
 
 ### 2. Installation
 

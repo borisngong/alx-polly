@@ -1,11 +1,39 @@
-'use server';
+"use server";
 
-import { createClient } from '@/lib/supabase/server';
-import { LoginFormData, RegisterFormData } from '../types';
+import { createClient } from "@/lib/supabase/server";
+import { LoginFormData, RegisterFormData } from "../types";
+
+// Simple in-memory rate limiter (for demo only)
+const rateLimitStore: Record<string, { count: number; last: number }> = {};
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX = 5; // max 5 requests per window
+
+function checkRateLimit(ip: string, action: string): string | null {
+  const key = `${action}:${ip}`;
+  const now = Date.now();
+  const entry = rateLimitStore[key] || { count: 0, last: now };
+  if (now - entry.last > RATE_LIMIT_WINDOW) {
+    entry.count = 1;
+    entry.last = now;
+  } else {
+    entry.count += 1;
+  }
+  rateLimitStore[key] = entry;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return `Too many requests. Please wait and try again.`;
+  }
+  return null;
+}
 
 export async function login(data: LoginFormData) {
-  const supabase = await createClient();
+  // For demo: use a random string as IP (replace with real IP extraction in production)
+  const ip = Math.random().toString(36).substring(2, 10);
+  const rateError = checkRateLimit(ip, "login");
+  if (rateError) {
+    return { error: rateError };
+  }
 
+  const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: data.email,
     password: data.password,
@@ -20,9 +48,35 @@ export async function login(data: LoginFormData) {
 }
 
 export async function register(data: RegisterFormData) {
-  const supabase = await createClient();
+  // For demo: use a random string as IP (replace with real IP extraction in production)
+  const ip = Math.random().toString(36).substring(2, 10);
+  const rateError = checkRateLimit(ip, "register");
+  if (rateError) {
+    return { error: rateError };
+  }
 
-  const { error } = await supabase.auth.signUp({
+  // Password strength validation
+  const password = data.password;
+  const minLength = 8;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  if (
+    password.length < minLength ||
+    !hasUpper ||
+    !hasLower ||
+    !hasNumber ||
+    !hasSpecial
+  ) {
+    return {
+      error:
+        "Password must be at least 8 characters and include upper, lower, number, and special character.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: signUpData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
     options: {
@@ -34,6 +88,15 @@ export async function register(data: RegisterFormData) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Require email verification before login
+  if (!signUpData?.user?.email_confirmed_at) {
+    return {
+      error:
+        "Registration successful. Please verify your email before logging in.",
+      emailVerificationRequired: true,
+    };
   }
 
   // Success: no error

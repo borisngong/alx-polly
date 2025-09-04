@@ -63,10 +63,24 @@ export async function getUserPolls() {
 // GET POLL BY ID
 export async function getPollById(id: string) {
   const supabase = await createClient();
+  // Get user from session
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) {
+    return { poll: null, error: userError.message };
+  }
+  if (!user) {
+    return { poll: null, error: "Not authenticated" };
+  }
+
+  // Only allow viewing poll if user is owner (or implement public/private logic)
   const { data, error } = await supabase
     .from("polls")
     .select("*")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (error) return { poll: null, error: error.message };
@@ -98,7 +112,24 @@ export async function submitVote(pollId: string, optionIndex: number) {
 // DELETE POLL
 export async function deletePoll(id: string) {
   const supabase = await createClient();
-  const { error } = await supabase.from("polls").delete().eq("id", id);
+  // Get user from session
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) {
+    return { error: userError.message };
+  }
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  // Only allow deleting poll if user is owner
+  const { error } = await supabase
+    .from("polls")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) return { error: error.message };
   revalidatePath("/polls");
   return { error: null };
