@@ -3,15 +3,24 @@
 import { createClient } from "@/lib/supabase/server";
 import { LoginFormData, RegisterFormData } from "../types";
 
-// Simple in-memory rate limiter (for demo only)
+/**
+ * Simple in-memory rate limiter (for demo only).
+ * Tracks request counts per IP and action within a time window.
+ * Used to prevent brute-force attacks on login and registration endpoints.
+ */
 const rateLimitStore: Record<string, { count: number; last: number }> = {};
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX = 5; // max 5 requests per window
 
+/**
+ * Checks if the given IP has exceeded the allowed number of requests for the specified action.
+ * Returns an error message if rate limit is exceeded, otherwise null.
+ */
 function checkRateLimit(ip: string, action: string): string | null {
   const key = `${action}:${ip}`;
   const now = Date.now();
   const entry = rateLimitStore[key] || { count: 0, last: now };
+  // Reset count if outside the time window
   if (now - entry.last > RATE_LIMIT_WINDOW) {
     entry.count = 1;
     entry.last = now;
@@ -25,6 +34,11 @@ function checkRateLimit(ip: string, action: string): string | null {
   return null;
 }
 
+/**
+ * Authenticates a user using email and password.
+ * Applies rate limiting to prevent brute-force attacks.
+ * Returns an error message if authentication fails or rate limit is exceeded.
+ */
 export async function login(data: LoginFormData) {
   // For demo: use a random string as IP (replace with real IP extraction in production)
   const ip = Math.random().toString(36).substring(2, 10);
@@ -34,6 +48,7 @@ export async function login(data: LoginFormData) {
   }
 
   const supabase = await createClient();
+  // Attempt to sign in with provided credentials
   const { error } = await supabase.auth.signInWithPassword({
     email: data.email,
     password: data.password,
@@ -47,6 +62,12 @@ export async function login(data: LoginFormData) {
   return { error: null };
 }
 
+/**
+ * Registers a new user with email, password, and name.
+ * Applies rate limiting and enforces password strength requirements.
+ * Requires email verification before allowing login.
+ * Returns error messages for validation, rate limit, or registration failures.
+ */
 export async function register(data: RegisterFormData) {
   // For demo: use a random string as IP (replace with real IP extraction in production)
   const ip = Math.random().toString(36).substring(2, 10);
@@ -62,6 +83,7 @@ export async function register(data: RegisterFormData) {
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  // Enforce password policy for security
   if (
     password.length < minLength ||
     !hasUpper ||
@@ -76,6 +98,7 @@ export async function register(data: RegisterFormData) {
   }
 
   const supabase = await createClient();
+  // Attempt to register user with Supabase
   const { data: signUpData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,

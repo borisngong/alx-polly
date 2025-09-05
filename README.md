@@ -77,7 +77,101 @@ This codebase was reviewed for common web application vulnerabilities. Below are
 
 ---
 
-## How to Remedy Further
+## Project Setup
+
+### Prerequisites
+- Node.js and npm
+- Supabase account (https://supabase.io/)
+
+### Environment Variables
+Create a `.env.local` file in the project root with:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### Supabase Configuration
+1. Create a new project in Supabase.
+2. In the Supabase dashboard, go to the SQL Editor and run the following to create tables:
+
+```sql
+-- Users table (Supabase Auth manages users automatically)
+
+-- Polls table
+CREATE TABLE polls (
+	id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+	user_id uuid REFERENCES auth.users(id),
+	question text NOT NULL,
+	options jsonb NOT NULL,
+	created_at timestamp DEFAULT now()
+);
+
+-- Votes table
+CREATE TABLE votes (
+	id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+	poll_id uuid REFERENCES polls(id),
+	user_id uuid REFERENCES auth.users(id),
+	option_index integer NOT NULL,
+	created_at timestamp DEFAULT now()
+);
+```
+
+3. Enable authentication in Supabase (email/password sign-up and login).
+	 - Go to Authentication > Settings and enable "Email" provider.
+	 - Optionally, configure email templates for verification.
+
+4. Copy your Supabase project URL and anon key into `.env.local`.
+
+5. (Optional) Set up Row Level Security (RLS) policies for polls and votes tables to restrict access:
+
+```sql
+-- Example RLS for polls: Only owner can update/delete
+CREATE POLICY "Owner can manage own polls" ON polls
+	FOR ALL
+	USING (auth.uid() = user_id);
+
+-- Example RLS for votes: Only owner can view their votes
+CREATE POLICY "Owner can view own votes" ON votes
+	FOR SELECT
+	USING (auth.uid() = user_id);
+```
+
+6. Your app will use Supabase client libraries to interact with these tables and authentication flows.
+
+### Install Dependencies
+```bash
+npm install
+```
+
+### Running the App Locally
+```bash
+npm run dev
+```
+Visit `http://localhost:3000` in your browser.
+
+## Usage Examples
+
+### Creating a Poll
+1. Register and log in.
+2. Go to the dashboard and click "Create Poll".
+3. Enter your question and options, then submit.
+
+### Voting on a Poll
+1. View available polls.
+2. Select a poll and choose your option.
+3. Submit your vote.
+
+### User Dashboard
+Manage your polls, view results, and delete polls you own.
+
+## How to Test
+Run the app locally and verify:
+- Registration and login work with strong passwords and email verification.
+- Poll creation, voting, and dashboard features function as expected.
+- Security features (rate limiting, ownership checks) are enforced.
+
+---
 
 - Add rate limiting and CAPTCHA for authentication endpoints.
 - Implement RBAC and ownership checks for all sensitive actions.

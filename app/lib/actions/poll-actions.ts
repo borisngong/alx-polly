@@ -3,13 +3,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// CREATE POLL
+/**
+ * Creates a new poll for the authenticated user.
+ * Validates question and options, ensures user is logged in.
+ * Returns error messages for validation or database failures.
+ */
 export async function createPoll(formData: FormData) {
   const supabase = await createClient();
 
+  // Extract poll question and options from form data
   const question = formData.get("question") as string;
   const options = formData.getAll("options").filter(Boolean) as string[];
 
+  // Validate poll input
   if (!question || options.length < 2) {
     return { error: "Please provide a question and at least two options." };
   }
@@ -26,6 +32,7 @@ export async function createPoll(formData: FormData) {
     return { error: "You must be logged in to create a poll." };
   }
 
+  // Insert poll into database
   const { error } = await supabase.from("polls").insert([
     {
       user_id: user.id,
@@ -38,11 +45,15 @@ export async function createPoll(formData: FormData) {
     return { error: error.message };
   }
 
+  // Revalidate poll list for all users
   revalidatePath("/polls");
   return { error: null };
 }
 
-// GET USER POLLS
+/**
+ * Fetches all polls created by the authenticated user.
+ * Returns an array of polls or an error if not authenticated.
+ */
 export async function getUserPolls() {
   const supabase = await createClient();
   const {
@@ -50,6 +61,7 @@ export async function getUserPolls() {
   } = await supabase.auth.getUser();
   if (!user) return { polls: [], error: "Not authenticated" };
 
+  // Query polls owned by the user
   const { data, error } = await supabase
     .from("polls")
     .select("*")
@@ -60,7 +72,10 @@ export async function getUserPolls() {
   return { polls: data ?? [], error: null };
 }
 
-// GET POLL BY ID
+/**
+ * Fetches a poll by its ID, only if the authenticated user is the owner.
+ * Returns the poll data or an error if not authorized.
+ */
 export async function getPollById(id: string) {
   const supabase = await createClient();
   // Get user from session
