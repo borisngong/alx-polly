@@ -3,6 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
+// Simple in-memory rate limiter (for demonstration; use Redis for production)
+const pollRateLimitMap = new Map<string, number[]>();
+const POLL_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const POLL_RATE_LIMIT_MAX = 3; // Max 3 polls per window
+
 /**
  * Creates a new poll for the authenticated user.
  * Validates question and options, ensures user is logged in.
@@ -32,6 +37,22 @@ export async function createPoll(formData: FormData) {
     return { error: "You must be logged in to create a poll." };
   }
 
+  // Rate limiting: allow max N polls per user per window
+  const now = Date.now();
+  const userKey = user.id;
+  let timestamps = pollRateLimitMap.get(userKey) || [];
+  // Remove timestamps outside window
+  timestamps = (Array.isArray(timestamps) ? timestamps : []).filter(
+    (ts: number) => now - ts < POLL_RATE_LIMIT_WINDOW_MS
+  );
+  if (timestamps.length >= POLL_RATE_LIMIT_MAX) {
+    return {
+      error: `Rate limit exceeded. You can create up to ${POLL_RATE_LIMIT_MAX} polls per minute.`,
+    };
+  }
+  timestamps.push(now);
+  pollRateLimitMap.set(userKey, timestamps);
+
   // Insert poll into database
   const { error } = await supabase.from("polls").insert([
     {
@@ -60,7 +81,12 @@ export async function createPoll(formData: FormData) {
  * Why: This function ensures users only see their own polls, supporting privacy and personalized dashboards.
  * Edge cases: Handles unauthenticated users and database errors gracefully.
  */
-export async function getUserPolls(): Promise<{ polls: any[]; error: string | null }> {
+import type { Poll } from "../types";
+
+export async function getUserPolls(): Promise<{
+  polls: Poll[];
+  error: string | null;
+}> {
   const supabase = await createClient();
   // Get the current authenticated user
   const {
@@ -82,8 +108,8 @@ export async function getUserPolls(): Promise<{ polls: any[]; error: string | nu
     // Database error occurred
     return { polls: [], error: error.message };
   }
-  // Return polls or empty array if none found
-  return { polls: data ?? [], error: null };
+  // Return polls as Poll[] or empty array if none found
+  return { polls: (data as Poll[]) ?? [], error: null };
 }
 
 /**
