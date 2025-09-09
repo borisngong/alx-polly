@@ -52,23 +52,37 @@ export async function createPoll(formData: FormData) {
 
 /**
  * Fetches all polls created by the authenticated user.
- * Returns an array of polls or an error if not authenticated.
+ *
+ * @returns {Promise<{ polls: any[]; error: string | null }>}
+ *   - polls: Array of poll objects belonging to the user
+ *   - error: Error message if not authenticated or if a database error occurs
+ *
+ * Why: This function ensures users only see their own polls, supporting privacy and personalized dashboards.
+ * Edge cases: Handles unauthenticated users and database errors gracefully.
  */
-export async function getUserPolls() {
+export async function getUserPolls(): Promise<{ polls: any[]; error: string | null }> {
   const supabase = await createClient();
+  // Get the current authenticated user
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { polls: [], error: "Not authenticated" };
+  if (!user) {
+    // User is not authenticated
+    return { polls: [], error: "Not authenticated" };
+  }
 
-  // Query polls owned by the user
+  // Query polls owned by the user, ordered by creation date (newest first)
   const { data, error } = await supabase
     .from("polls")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  if (error) return { polls: [], error: error.message };
+  if (error) {
+    // Database error occurred
+    return { polls: [], error: error.message };
+  }
+  // Return polls or empty array if none found
   return { polls: data ?? [], error: null };
 }
 
