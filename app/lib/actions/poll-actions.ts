@@ -3,10 +3,22 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// Simple in-memory rate limiter (for demonstration; use Redis for production)
-const pollRateLimitMap = new Map<string, number[]>();
+// Redis-backed rate limiter (fallback to in-memory for local/dev)
+import { createClient as createRedisClient } from "redis";
 const POLL_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const POLL_RATE_LIMIT_MAX = 3; // Max 3 polls per window
+
+const REDIS_URL = process.env.REDIS_URL;
+let redis: ReturnType<typeof createRedisClient> | null = null;
+if (REDIS_URL) {
+  redis = createRedisClient({ url: REDIS_URL });
+  redis.connect().catch(() => {
+    // Redis connection failed, fallback will be used
+    redis = null;
+  });
+}
+// Fallback in-memory map for local/dev only
+const pollRateLimitMap = new Map<string, number[]>();
 
 /**
  * Creates a new poll for the authenticated user.
@@ -38,20 +50,46 @@ export async function createPoll(formData: FormData) {
   }
 
   // Rate limiting: allow max N polls per user per window
-  const now = Date.now();
   const userKey = user.id;
-  let timestamps = pollRateLimitMap.get(userKey) || [];
-  // Remove timestamps outside window
-  timestamps = (Array.isArray(timestamps) ? timestamps : []).filter(
-    (ts: number) => now - ts < POLL_RATE_LIMIT_WINDOW_MS
-  );
-  if (timestamps.length >= POLL_RATE_LIMIT_MAX) {
+  let rateLimited = false;
+  let rateLimitError = null;
+  if (redis) {
+    try {
+      // Use Redis INCR+EXPIRE for atomic rate limiting
+      const redisKey = `poll:create:${userKey}`;
+      const count = await redis.incr(redisKey);
+      if (count === 1) {
+        await redis.expire(
+          redisKey,
+          Math.ceil(POLL_RATE_LIMIT_WINDOW_MS / 1000)
+        );
+      }
+      if (count > POLL_RATE_LIMIT_MAX) {
+        rateLimited = true;
+      }
+    } catch (err) {
+      // Redis error, fallback to in-memory
+      rateLimitError = err;
+    }
+  }
+  if (!redis || rateLimitError) {
+    // Fallback: in-memory (for local/dev only)
+    const now = Date.now();
+    let timestamps = pollRateLimitMap.get(userKey) || [];
+    timestamps = (Array.isArray(timestamps) ? timestamps : []).filter(
+      (ts: number) => now - ts < POLL_RATE_LIMIT_WINDOW_MS
+    );
+    if (timestamps.length >= POLL_RATE_LIMIT_MAX) {
+      rateLimited = true;
+    }
+    timestamps.push(now);
+    pollRateLimitMap.set(userKey, timestamps);
+  }
+  if (rateLimited) {
     return {
       error: `Rate limit exceeded. You can create up to ${POLL_RATE_LIMIT_MAX} polls per minute.`,
     };
   }
-  timestamps.push(now);
-  pollRateLimitMap.set(userKey, timestamps);
 
   // Insert poll into database
   const { error } = await supabase.from("polls").insert([
