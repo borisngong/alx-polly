@@ -214,3 +214,39 @@ npm run dev
 The application will be available at `http://localhost:3000`.
 
 Good luck, engineer! This is your chance to step into the shoes of a security professional and make a real impact on the quality and safety of this application. Happy hunting!
+
+---
+
+## 🧠 Context-Aware AI & Supabase MCP Integration
+
+This project demonstrates context-aware AI development using Context7 MCP and Supabase MCP servers. The AI agent is configured to interact with your Supabase database, enabling schema-aware code generation, documentation, and queries directly from your IDE (Cursor, Gemini CLI, etc.).
+
+### MCP Setup
+- Configured `.gemini/settings.json` with Supabase MCP server, project ref, and access token.
+- Example MCP config:
+
+```json
+{
+  "name": "supabase",
+  "command": "npx",
+  "args": [
+    "-y",
+    "@supabase/mcp-server-supabase@latest",
+    "--read-only",
+    "--project-ref=<project-ref>"
+  ],
+  "env": {
+    "SUPABASE_ACCESS_TOKEN": "<PERSONAL_ACCESS_TOKEN>"
+  }
+}
+```
+
+### Example MCP Prompts
+- `/mcp supabase list_tables`
+- `/mcp supabase generate_typescript_types table=polls`
+- `/mcp supabase execute_sql sql="SELECT * FROM polls LIMIT 5;"`
+
+### Screenshots
+- See `screenshots/` for examples of MCP in action.
+
+---
